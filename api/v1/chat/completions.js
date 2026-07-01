@@ -1,11 +1,18 @@
 const OPENCODE_URL = "https://opencode.ai/zen/v1/chat/completions";
+const NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 
-const ALLOWED_MODELS = [
-    "mimo-v2.5-free",
-    "deepseek-v4-flash-free",
-    "nemotron-3-ultra-free",
-    "north-mini-code-free"
-];
+const MODELS = {
+    "mimo-v2.5-free":          { provider: "opencode", upstream: "mimo-v2.5-free" },
+    "deepseek-v4-flash-free":  { provider: "opencode", upstream: "deepseek-v4-flash-free" },
+    "nemotron-3-ultra-free":   { provider: "opencode", upstream: "nemotron-3-ultra-free" },
+    "north-mini-code-free":    { provider: "opencode", upstream: "north-mini-code-free" },
+    "minimax-m3":              { provider: "nvidia",   upstream: "minimaxai/minimax-m3" },
+    "step-3.7-flash":          { provider: "nvidia",   upstream: "stepfun-ai/step-3.7-flash" },
+    "kimi-k2.6":               { provider: "nvidia",   upstream: "moonshotai/kimi-k2.6" },
+    "deepseek-v4-pro":         { provider: "nvidia",   upstream: "deepseek-ai/deepseek-v4-pro" }
+};
+
+const ALLOWED_MODELS = Object.keys(MODELS);
 
 const SECURITY = {
     "Access-Control-Allow-Origin": "*",
@@ -343,27 +350,47 @@ export default async function handler(req, res) {
     if (body.top_p !== undefined) {
         body.top_p = Math.min(Math.max(0, Number(body.top_p) || 1), 1);
     }
+    if (body.max_tokens !== undefined) {
+        body.max_tokens = Math.floor(Number(body.max_tokens) || 4096);
+    }
 
-    [
-        "seed", "user", "top_k", "min_p", "service_tier",
-        "frequency_penalty", "presence_penalty", "logit_bias",
-        "n", "logprobs", "top_logprobs", "response_format",
-        "tools", "tool_choice", "parallel_tool_calls", "stop",
-        "metadata", "log", "analytics", "request_id", "trace",
-        "tags", "session_id", "conversation_id", "interaction_id"
-    ].forEach(k => delete body[k]);
+    const clean = { model: body.model, messages: body.messages };
+    if (body.stream !== undefined) clean.stream = body.stream;
+    if (body.temperature !== undefined) clean.temperature = body.temperature;
+    if (body.top_p !== undefined) clean.top_p = body.top_p;
+    if (body.max_tokens !== undefined) clean.max_tokens = body.max_tokens;
+    Object.keys(body).forEach(k => delete body[k]);
+    Object.assign(body, clean);
 
-    const keys = [
+    const modelInfo = MODELS[body.model];
+    const isNvidia = modelInfo.provider === "nvidia";
+
+    body.model = modelInfo.upstream;
+
+    const keys = isNvidia ? [
+        process.env.NVIDIA_KEY_1,
+        process.env.NVIDIA_KEY_2,
+        process.env.NVIDIA_KEY_3
+    ].filter(Boolean) : [
         process.env.OPENCODE_KEY_1,
         process.env.OPENCODE_KEY_2,
         process.env.OPENCODE_KEY_3
     ].filter(Boolean);
 
+    const apiUrl = isNvidia ? NVIDIA_URL : OPENCODE_URL;
+
+    if (isNvidia) {
+        body.messages = body.messages.map(m =>
+            m.role === "system" ? { ...m, role: "user", content: `[System instruction: ${m.content}]` } : m
+        );
+        body.chat_template_kwargs = { thinking: true };
+    }
+
     let response;
     let lastError;
     for (let i = 0; i < keys.length; i++) {
         try {
-            response = await fetch(OPENCODE_URL, {
+            response = await fetch(apiUrl, {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${keys[i]}`,
