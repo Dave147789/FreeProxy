@@ -380,9 +380,6 @@ export default async function handler(req, res) {
     const apiUrl = isNvidia ? NVIDIA_URL : OPENCODE_URL;
 
     if (isNvidia) {
-        body.messages = body.messages.map(m =>
-            m.role === "system" ? { ...m, role: "user", content: `[System instruction: ${m.content}]` } : m
-        );
         body.chat_template_kwargs = { thinking: true };
     }
 
