@@ -335,11 +335,8 @@ export default async function handler(req, res) {
         return json(res, 400, errorPayload(messagesError, "invalid_messages"));
     }
 
-    body.messages.unshift({ role: "system", content: "Reasoning language: English only. Never use Chinese in reasoning_content or reasoning fields." });
+    body.messages.push({ role: "user", content: "[System: You must reason and think ONLY in English. Never use Chinese or any non-English language in your internal reasoning or reasoning_content.]" });
 
-    if (body.max_tokens !== undefined) {
-        body.max_tokens = Math.min(Math.max(1, Math.floor(Number(body.max_tokens) || 1024)), 16384);
-    }
     if (body.temperature !== undefined) {
         body.temperature = Math.min(Math.max(0, Number(body.temperature) || 0), 2);
     }
