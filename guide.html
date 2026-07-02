@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" href="/logo.jpg" type="image/jpeg">
+    <meta name="theme-color" content="#0a0a0a">
+    <title>Guide — OpenCode Proxy</title>
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0a0a;
+            --surface: #141414;
+            --border: #222;
+            --text: #e5e5e5;
+            --text-dim: #888;
+            --accent: #22c55e;
+            --accent-dim: #166534;
+            --red: #ef4444;
+            --yellow: #eab308;
+            --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        html { font-size: 16px; }
+
+        body {
+            font-family: var(--sans);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        header {
+            padding: 48px 0 32px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .brand h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        header p {
+            color: var(--text-dim);
+            font-size: 0.95rem;
+            margin-top: 4px;
+        }
+
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .back {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-bottom: 24px;
+        }
+
+        .back:hover { color: var(--text); text-decoration: none; }
+
+        section {
+            padding: 32px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        section:last-child { border-bottom: none; }
+
+        h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            letter-spacing: -0.01em;
+        }
+
+        h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            margin-top: 20px;
+            color: var(--text);
+        }
+
+        p, li {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            line-height: 1.7;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        ul li {
+            padding: 6px 0;
+            padding-left: 16px;
+            position: relative;
+        }
+
+        ul li::before {
+            content: '›';
+            position: absolute;
+            left: 0;
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        code {
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 2px 6px;
+            color: var(--accent);
+            user-select: all;
+        }
+
+        .block {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin: 12px 0;
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            color: var(--accent);
+            user-select: all;
+            word-break: break-all;
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin: 12px 0;
+        }
+
+        .error .tag {
+            display: inline-block;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--red);
+            margin-bottom: 6px;
+        }
+
+        .error p {
+            font-size: 0.85rem;
+            color: #fca5a5;
+        }
+
+        .fix {
+            background: rgba(34, 197, 94, 0.08);
+            border: 1px solid rgba(34, 197, 94, 0.2);
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin: 12px 0;
+        }
+
+        .fix .tag {
+            display: inline-block;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--accent);
+            margin-bottom: 6px;
+        }
+
+        .fix p {
+            font-size: 0.85rem;
+            color: #86efac;
+        }
+
+        .step {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            margin: 12px 0;
+        }
+
+        .step-num {
+            flex-shrink: 0;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--accent-dim);
+            color: var(--accent);
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--mono);
+        }
+
+        .step-text {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            padding-top: 2px;
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 24px 0;
+        }
+
+        footer {
+            padding: 32px 0;
+            text-align: center;
+        }
+
+        footer p {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        @media (max-width: 640px) {
+            header { padding: 32px 0 24px; }
+            .brand h1 { font-size: 1.25rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="brand">
+                <h1>Setup Guide</h1>
+            </div>
+            <p>How to connect this proxy to JanitorAI and other platforms.</p>
+        </header>
+
+        <a href="/" class="back">← Back to home</a>
+
+        <section>
+            <h2>Proxy URLs</h2>
+            <p>Use one of these URLs as your custom model endpoint:</p>
+
+            <h3>Vercel (direct)</h3>
+            <div class="block">https://janitor-pi.vercel.app/v1</div>
+
+            <h3>Cloudflare Worker (recommended)</h3>
+            <div class="block">https://janitor-pi.mochibun.workers.dev/v1</div>
+
+            <p style="margin-top: 12px;">The Worker URL is recommended for JanitorAI because it bypasses Content Security Policy restrictions.</p>
+        </section>
+
+        <section>
+            <h2>JanitorAI Setup</h2>
+
+            <div class="step">
+                <div class="step-num">1</div>
+                <div class="step-text">Open JanitorAI and go to <strong>Settings</strong> → <strong>API</strong></div>
+            </div>
+
+            <div class="step">
+                <div class="step-num">2</div>
+                <div class="step-text">Select <strong>Custom</strong> as the API provider</div>
+            </div>
+
+            <div class="step">
+                <div class="step-num">3</div>
+                <div class="step-text">Paste the proxy URL:
+                    <div class="block">https://janitor-pi.mochibun.workers.dev/v1</div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-num">4</div>
+                <div class="step-text">Enter any string as the API key (e.g. <code>free</code>) — it's not validated</div>
+            </div>
+
+            <div class="step">
+                <div class="step-num">5</div>
+                <div class="step-text">Select a model and start chatting</div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Common Errors</h2>
+
+            <div class="error">
+                <div class="tag">Error — CSP Blocked</div>
+                <p>Content-Security-Policy: The page's settings blocked the loading of a resource at https://janitor-pi.vercel.app</p>
+            </div>
+
+            <div class="fix">
+                <div class="tag">Fix</div>
+                <p>Use the Worker URL instead of the Vercel URL. JanitorAI's CSP only allows the Worker domain.</p>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="error">
+                <div class="tag">Error — URL Doubled</div>
+                <p>Connect-src blocked: .../chat/completions/chat/completions</p>
+            </div>
+
+            <div class="fix">
+                <div class="tag">Fix</div>
+                <p>Enter <code>https://janitor-pi.mochibun.workers.dev/v1</code> — not <code>/v1/chat/completions</code>. The platform appends <code>/chat/completions</code> automatically.</p>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="error">
+                <div class="tag">Error — Empty Response</div>
+                <p>Error: Empty response received from API</p>
+            </div>
+
+            <div class="fix">
+                <div class="tag">Fix</div>
+                <p>The model may be temporarily unavailable. Try a different model or wait a few seconds and retry.</p>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="error">
+                <div class="tag">Error — Network Error</div>
+                <p>TypeError: Failed to fetch / NetworkError when attempting to fetch resource</p>
+            </div>
+
+            <div class="fix">
+                <div class="tag">Fix</div>
+                <p>Check your internet connection. If using a VPN or ad blocker, try disabling them temporarily. Make sure the proxy URL is correct.</p>
+            </div>
+        </section>
+
+        <section>
+            <h2>Available Models</h2>
+            <ul>
+                <li><code>mimo-v2.5-free</code> — General-purpose reasoning model</li>
+                <li><code>deepseek-v4-flash-free</code> — Fast inference, strong coding</li>
+                <li><code>nemotron-3-ultra-free</code> — NVIDIA's large reasoning model</li>
+                <li><code>north-mini-code-free</code> — Lightweight code specialist</li>
+                <li><code>mythomax</code> — Roleplay-optimized model</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Other Platforms</h2>
+            <p>This proxy follows the OpenAI API format. Any platform that supports custom OpenAI-compatible endpoints should work:</p>
+            <ul>
+                <li>Set the base URL to one of the proxy URLs above</li>
+                <li>Enter any string as the API key</li>
+                <li>Select a model from the list</li>
+            </ul>
+        </section>
+
+        <footer>
+            <p>OpenCode Proxy — Free AI models for everyone</p>
+        </footer>
+    </div>
+</body>
+</html>

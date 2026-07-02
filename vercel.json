@@ -44,13 +44,15 @@
         { "src": "api/v1/models.js", "use": "@vercel/node" },
         { "src": "showcase.mp4", "use": "@vercel/static" },
         { "src": "logo.jpg", "use": "@vercel/static" },
-        { "src": "index.html", "use": "@vercel/static" }
+        { "src": "index.html", "use": "@vercel/static" },
+        { "src": "guide.html", "use": "@vercel/static" }
     ],
     "routes": [
         { "src": "/v1/chat/completions", "dest": "/api/v1/chat/completions.js" },
         { "src": "/v1/models", "dest": "/api/v1/models.js" },
         { "src": "/showcase.mp4", "dest": "/showcase.mp4" },
         { "src": "/logo.jpg", "dest": "/logo.jpg" },
+        { "src": "/guide", "dest": "/guide.html" },
         { "src": "/(.*)", "dest": "/index.html" }
     ]
 }
