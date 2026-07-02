@@ -3,7 +3,12 @@ const ALLOWED_MODELS = [
     "deepseek-v4-flash-free",
     "nemotron-3-ultra-free",
     "north-mini-code-free",
-    "mythomax"
+    "mythomax",
+    "glm-4.7",
+    "glm-5.2",
+    "deepseek-r1",
+    "kimi-k2.5",
+    "qwen2.5-coder"
 ];
 
 const CORS = {

@@ -1,12 +1,24 @@
 const OPENCODE_URL = "https://opencode.ai/zen/v1/chat/completions";
 const CHUB_URL = "https://gateway.chub.ai/v1/chat/completions";
+const CLOUDFLARE_URL = (accountId, model) => `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
+
+const CLOUDFLARE_KEYS = [
+    { key: () => process.env.CLOUDFLARE_KEY_1, accountId: () => process.env.CLOUDFLARE_ACCOUNT_ID },
+    { key: () => process.env.CLOUDFLARE_KEY_3, accountId: () => process.env.CLOUDFLARE_ACCOUNT_ID_3 },
+    { key: () => process.env.CLOUDFLARE_KEY_4, accountId: () => process.env.CLOUDFLARE_ACCOUNT_ID_4 }
+].filter(k => k.key() && k.accountId());
 
 const MODELS = {
     "mimo-v2.5-free":          { provider: "opencode", upstream: "mimo-v2.5-free" },
     "deepseek-v4-flash-free":  { provider: "opencode", upstream: "deepseek-v4-flash-free" },
     "nemotron-3-ultra-free":   { provider: "opencode", upstream: "nemotron-3-ultra-free" },
     "north-mini-code-free":    { provider: "opencode", upstream: "north-mini-code-free" },
-    "mythomax":                { provider: "chub",     upstream: "mobile" }
+    "mythomax":                { provider: "chub",     upstream: "mobile" },
+    "glm-4.7":                 { provider: "cloudflare", upstream: "@cf/zai-org/glm-4.7-flash",              format: "openai" },
+    "glm-5.2":                 { provider: "cloudflare", upstream: "@cf/zai-org/glm-5.2",                     format: "openai" },
+    "deepseek-r1":             { provider: "cloudflare", upstream: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b", format: "response" },
+    "kimi-k2.5":               { provider: "cloudflare", upstream: "@cf/moonshotai/kimi-k2.5",                format: "openai" },
+    "qwen2.5-coder":           { provider: "cloudflare", upstream: "@cf/qwen/qwen2.5-coder-32b-instruct",    format: "response" }
 };
 
 const ALLOWED_MODELS = Object.keys(MODELS);
@@ -350,6 +362,7 @@ export default async function handler(req, res) {
 
     const modelInfo = MODELS[body.model];
     const isChub = modelInfo.provider === "chub";
+    const isCloudflare = modelInfo.provider === "cloudflare";
 
     if (body.max_tokens !== undefined) {
         body.max_tokens = Math.floor(Number(body.max_tokens) || 4096);
@@ -367,9 +380,9 @@ export default async function handler(req, res) {
 
     body.model = MODELS[body.model].upstream;
 
-    const apiUrl = isChub ? CHUB_URL : OPENCODE_URL;
+    const apiUrl = isCloudflare ? null : isChub ? CHUB_URL : OPENCODE_URL;
 
-    const keys = isChub ? [
+    const keys = isCloudflare ? CLOUDFLARE_KEYS : isChub ? [
         process.env.CHUB_KEY_1,
         process.env.CHUB_KEY_2,
         process.env.CHUB_KEY_3
@@ -386,20 +399,25 @@ export default async function handler(req, res) {
             const headers = {
                 "Content-Type": "application/json"
             };
-            if (isChub) {
+            if (isCloudflare) {
+                headers["Authorization"] = `Bearer ${keys[i].key()}`;
+            } else if (isChub) {
                 headers["samwise"] = keys[i];
                 headers["CH-API-KEY"] = keys[i];
             } else {
                 headers["Authorization"] = `Bearer ${keys[i]}`;
             }
-            response = await fetch(apiUrl, {
+            const url = isCloudflare
+                ? CLOUDFLARE_URL(keys[i].accountId(), body.model)
+                : apiUrl;
+            response = await fetch(url, {
                 method: "POST",
                 headers,
                 body: JSON.stringify(body),
-                signal: AbortSignal.timeout(isChub ? 30000 : 120000)
+                signal: AbortSignal.timeout(isCloudflare ? 60000 : isChub ? 30000 : 120000)
             });
             if (response.status !== 429) break;
-            lastError = await response.text();
+            lastError = `status ${response.status}`;
         } catch (err) {
             lastError = err.message;
         }
@@ -421,11 +439,80 @@ export default async function handler(req, res) {
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
+        const cfFormat = modelInfo.format;
+
         try {
+            let buffer = "";
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                res.write(decoder.decode(value, { stream: true }));
+                buffer += decoder.decode(value, { stream: true });
+
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || "";
+
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed.startsWith("data: ")) {
+                        if (trimmed) res.write(`${trimmed}\n\n`);
+                        continue;
+                    }
+                    const payload = trimmed.slice(6);
+                    if (payload === "[DONE]") {
+                        res.write("data: [DONE]\n\n");
+                        continue;
+                    }
+
+                    try {
+                        const chunk = JSON.parse(payload);
+
+                        if (cfFormat === "response" && chunk.response !== undefined) {
+                            res.write(`data: ${JSON.stringify({
+                                id: chunk.id || "chatcmpl-cf",
+                                object: "chat.completion.chunk",
+                                created: Math.floor(Date.now() / 1000),
+                                model: body.model,
+                                choices: [{
+                                    index: 0,
+                                    delta: { content: chunk.response },
+                                    finish_reason: null
+                                }]
+                            })}\n\n`);
+                        } else if (cfFormat === "openai") {
+                            const choice = chunk.choices?.[0];
+                            if (choice) {
+                                const delta = choice.delta || {};
+                                const reasoning = delta.reasoning_content || delta.reasoning || "";
+                                const content = delta.content || "";
+                                const parts = [];
+                                if (reasoning) parts.push({ delta: { reasoning_content: reasoning, reasoning: reasoning }, finish_reason: null });
+                                if (content) parts.push({ delta: { content }, finish_reason: null });
+                                for (const part of parts) {
+                                    res.write(`data: ${JSON.stringify({
+                                        id: chunk.id || "chatcmpl-cf",
+                                        object: "chat.completion.chunk",
+                                        created: chunk.created || Math.floor(Date.now() / 1000),
+                                        model: body.model,
+                                        choices: [{ index: 0, ...part }]
+                                    })}\n\n`);
+                                }
+                                if (choice.finish_reason) {
+                                    res.write(`data: ${JSON.stringify({
+                                        id: chunk.id || "chatcmpl-cf",
+                                        object: "chat.completion.chunk",
+                                        created: chunk.created || Math.floor(Date.now() / 1000),
+                                        model: body.model,
+                                        choices: [{ index: 0, delta: {}, finish_reason: choice.finish_reason }]
+                                    })}\n\n`);
+                                }
+                            }
+                        } else {
+                            res.write(line + "\n\n");
+                        }
+                    } catch {
+                        res.write(trimmed + "\n\n");
+                    }
+                }
             }
         } catch {}
         return res.end();
@@ -444,7 +531,29 @@ export default async function handler(req, res) {
         }
 
         if (!out.error) {
-            out = normalizeCompletion(out, body.model);
+            if (isCloudflare && out.result) {
+                out = out.result;
+            }
+            if (modelInfo.format === "response" && out.response !== undefined) {
+                out = {
+                    id: out.id || `chatcmpl-${Date.now()}`,
+                    object: "chat.completion",
+                    created: out.created || Math.floor(Date.now() / 1000),
+                    model: body.model,
+                    choices: [{
+                        index: 0,
+                        message: {
+                            role: "assistant",
+                            content: out.response,
+                            reasoning_content: out.response.includes("<think>") ? out.response.split("<think>")[1]?.split("</think>")[0]?.trim() : ""
+                        },
+                        finish_reason: "stop"
+                    }],
+                    usage: out.usage || DEFAULT_USAGE
+                };
+            } else {
+                out = normalizeCompletion(out, body.model);
+            }
         }
     } catch {
         out = errorPayload("Invalid upstream response", "invalid_upstream_response");
