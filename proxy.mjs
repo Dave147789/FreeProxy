@@ -16,7 +16,7 @@ const CHUB_KEYS = [process.env.CHUB_KEY_1, process.env.CHUB_KEY_2].filter(Boolea
 const SECURITY = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+    "Access-Control-Allow-Headers": "*",
     "Access-Control-Max-Age": "86400"
 };
 
@@ -25,9 +25,14 @@ function json(res, status, data) {
     res.end(JSON.stringify(data));
 }
 
+const MODELS = { object: "list", data: ALLOWED_MODELS.map(id => ({ id, object: "model", created: 1, owned_by: id === "mythomax" ? "chub" : "opencode" })) };
+
 const server = http.createServer(async (req, res) => {
+    const url = new URL(req.url, "http://localhost");
     if (req.method === "OPTIONS") { res.writeHead(204, SECURITY); return res.end(); }
-    if (req.method === "GET") return json(res, 200, { status: "ok" });
+    if (url.pathname === "/v1/models" && req.method === "GET") return json(res, 200, MODELS);
+    if (url.pathname === "/v1/chat/completions" && req.method === "GET") return json(res, 200, { status: "ok" });
+    if (url.pathname === "/" || url.pathname === "") return json(res, 200, { status: "ok", endpoint: "/v1/chat/completions", models: ALLOWED_MODELS });
     if (req.method !== "POST") return json(res, 405, { error: { message: "Method not allowed" } });
 
     let body;
@@ -65,7 +70,7 @@ const server = http.createServer(async (req, res) => {
             upstreamRes = await fetch(apiUrl, { method: "POST", headers, body: JSON.stringify(clean) });
             if (upstreamRes.status === 200) break;
             const errText = await upstreamRes.text();
-            lastError = `${upstreamRes.status} (key ${i+1}/${keys.length}): ${errText}`;
+            lastError = `${upstreamRes.status} (key ${i + 1}/${keys.length}): ${errText}`;
             if (upstreamRes.status !== 429 && upstreamRes.status !== 503 && upstreamRes.status !== 402) break;
             upstreamRes = null;
             await new Promise(r => setTimeout(r, 300));
