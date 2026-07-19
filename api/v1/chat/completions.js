@@ -1,4 +1,4 @@
-const TUNNEL_URL = "https://compact-routes-cleaner-ranch.trycloudflare.com";
+const TUNNEL_URL = "https://free-proxy-d4v3.vercel.app";
 const ALLOWED_MODELS = ["mimo-v2.5-free", "deepseek-v4-flash-free", "nemotron-3-ultra-free", "north-mini-code-free", "mythomax"];
 
 const CORS = {
